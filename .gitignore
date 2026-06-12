@@ -1,0 +1,4 @@
+*.exe
+*.pck
+*.console.exe
+.DS_Store
