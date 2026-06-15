@@ -25,14 +25,15 @@ var played_player_texture: TextureRect
 var played_bot_texture: TextureRect
 var played_player_name: Label
 var played_bot_name: Label
+var played_player_stats: Label
+var played_bot_stats: Label
 var hand_container: Control
 var root_control: Control
 
 const STATS = [
-	{"key": "visits", "label": "Total Visits"},
-	{"key": "favoritedCount", "label": "Favourites"},
-	{"key": "playing", "label": "Playing Now"},
-	{"key": "age_days", "label": "Age (Days)"}
+	{"key": "visits", "label": "Total Visits", "short": "Visits"},
+	{"key": "favoritedCount", "label": "Favourites", "short": "Favs"},
+	{"key": "playing", "label": "Playing Now", "short": "Playing"}
 ]
 
 const COL_BG = Color(0.06, 0.07, 0.10)
@@ -42,6 +43,7 @@ const COL_YOU = Color(0.30, 0.92, 0.56)
 const COL_BOT = Color(1.0, 0.42, 0.42)
 const COL_WHITE = Color(0.95, 0.96, 0.98)
 const COL_DIM = Color(0.55, 0.58, 0.65)
+const COL_STAT = Color(0.72, 0.76, 0.85)
 const COL_WIN = Color(0.30, 0.92, 0.56)
 const COL_LOSE = Color(1.0, 0.42, 0.42)
 const COL_DRAW = Color(1.0, 0.82, 0.30)
@@ -50,8 +52,7 @@ const COL_ACCENT = Color(0.35, 0.55, 1.0)
 const STAT_COLORS = [
 	Color(0.60, 0.30, 0.95),
 	Color(0.25, 0.50, 0.95),
-	Color(0.20, 0.75, 0.55),
-	Color(0.95, 0.45, 0.35)
+	Color(0.20, 0.75, 0.55)
 ]
 
 func _ready():
@@ -75,12 +76,6 @@ func _on_data_received(_result, response_code, _headers, body):
 		return
 	var data = json.get_data()
 	all_games = data["games"]
-	for game in all_games:
-		var created_str = game["created"].substr(0, 10)
-		var parts = created_str.split("-")
-		var created_unix = _date_to_unix(int(parts[0]), int(parts[1]), int(parts[2]))
-		var now = Time.get_unix_time_from_system()
-		game["age_days"] = int((now - created_unix) / 86400.0)
 	for stat in STATS:
 		var max_val = 1
 		for game in all_games:
@@ -89,15 +84,6 @@ func _on_data_received(_result, response_code, _headers, body):
 				max_val = v
 		stat_max[stat["key"]] = max_val
 	_start_game()
-
-func _date_to_unix(y, m, d):
-	var days = (y - 1970) * 365 + (y - 1969) / 4
-	var month_days = [0,31,59,90,120,151,181,212,243,273,304,334]
-	days += month_days[m - 1]
-	if m > 2 and (y % 4 == 0):
-		days += 1
-	days += d - 1
-	return days * 86400
 
 func _start_game():
 	player_score = 0
@@ -122,6 +108,8 @@ func _next_round():
 	played_bot_texture.texture = null
 	played_player_name.text = "?"
 	played_bot_name.text = "?"
+	played_player_stats.text = ""
+	played_bot_stats.text = ""
 	_update_score()
 	_show_hand()
 	if stat_picker == "player":
@@ -156,7 +144,7 @@ func _show_hand():
 		btn.queue_free()
 	hand_buttons.clear()
 	var card_w = 118
-	var card_h = 172
+	var card_h = 200
 	var gap = 8
 	var total_w = player_hand.size() * card_w + (player_hand.size() - 1) * gap
 	var start_x = (624 - total_w) / 2.0
@@ -167,13 +155,13 @@ func _show_hand():
 		btn_root.size = Vector2(card_w, card_h)
 		hand_container.add_child(btn_root)
 
-		var panel = _make_round_panel(COL_PANEL_LIGHT, 14)
+		var panel = _make_round_panel(COL_PANEL_LIGHT, 12)
 		panel.size = Vector2(card_w, card_h)
 		btn_root.add_child(panel)
 
 		var img = TextureRect.new()
 		img.position = Vector2(7, 7)
-		img.size = Vector2(card_w - 14, card_w - 14)
+		img.size = Vector2(card_w - 14, 80)
 		img.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 		img.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
 		img.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
@@ -182,15 +170,26 @@ func _show_hand():
 		_load_image(game["icon"]["imageUrl"], img)
 
 		var lbl = Label.new()
-		lbl.position = Vector2(5, card_w - 2)
-		lbl.size = Vector2(card_w - 10, card_h - card_w)
+		lbl.position = Vector2(4, 90)
+		lbl.size = Vector2(card_w - 8, 30)
 		lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 		lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-		lbl.add_theme_font_size_override("font_size", 11)
+		lbl.add_theme_font_size_override("font_size", 10)
 		lbl.add_theme_color_override("font_color", COL_WHITE)
 		lbl.text = game["displayName"]
 		btn_root.add_child(lbl)
+
+		var stats_lbl = Label.new()
+		stats_lbl.position = Vector2(6, 122)
+		stats_lbl.size = Vector2(card_w - 12, 72)
+		stats_lbl.add_theme_font_size_override("font_size", 10)
+		stats_lbl.add_theme_color_override("font_color", COL_STAT)
+		var stat_text = ""
+		for s in STATS:
+			stat_text += s["short"] + ": " + _format_number(int(game[s["key"]])) + "\n"
+		stats_lbl.text = stat_text
+		btn_root.add_child(stats_lbl)
 
 		var btn = Button.new()
 		btn.position = Vector2(0, 0)
@@ -265,9 +264,17 @@ func _on_card_chosen(idx):
 	_set_hand_buttons_enabled(false)
 	_reveal_played_cards()
 
+func _stats_block(game) -> String:
+	var t = ""
+	for s in STATS:
+		t += s["short"] + ": " + _format_number(int(game[s["key"]])) + "\n"
+	return t
+
 func _reveal_played_cards():
 	played_player_name.text = current_player_card["displayName"]
 	played_bot_name.text = current_bot_card["displayName"]
+	played_player_stats.text = _stats_block(current_player_card)
+	played_bot_stats.text = _stats_block(current_bot_card)
 	_load_image(current_player_card["icon"]["imageUrl"], played_player_texture)
 	_load_image(current_bot_card["icon"]["imageUrl"], played_bot_texture)
 
@@ -333,7 +340,7 @@ func _end_game():
 		result_label.add_theme_color_override("font_color", COL_DRAW)
 	var play_again = Button.new()
 	play_again.text = "Play Again"
-	play_again.position = Vector2(162, 1000)
+	play_again.position = Vector2(162, 1010)
 	play_again.size = Vector2(320, 58)
 	play_again.pressed.connect(_on_play_again)
 	play_again.add_theme_stylebox_override("normal", _make_btn_style(COL_ACCENT, 14, Color(0,0,0,0), 0))
@@ -409,13 +416,15 @@ func _build_ui():
 	var player_panel = _make_played_panel(root, Vector2(12, 88), "YOU", COL_YOU)
 	played_player_texture = player_panel[0]
 	played_player_name = player_panel[1]
+	played_player_stats = player_panel[2]
 
 	var bot_panel = _make_played_panel(root, Vector2(324, 88), "BOT", COL_BOT)
 	played_bot_texture = bot_panel[0]
 	played_bot_name = bot_panel[1]
+	played_bot_stats = bot_panel[2]
 
 	result_label = Label.new()
-	result_label.position = Vector2(10, 478)
+	result_label.position = Vector2(10, 488)
 	result_label.size = Vector2(620, 70)
 	result_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	result_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -423,14 +432,14 @@ func _build_ui():
 	root.add_child(result_label)
 
 	hand_container = Control.new()
-	hand_container.position = Vector2(8, 556)
-	hand_container.size = Vector2(624, 172)
+	hand_container.position = Vector2(8, 566)
+	hand_container.size = Vector2(624, 200)
 	root.add_child(hand_container)
 
 	for i in range(STATS.size()):
 		var btn = Button.new()
-		btn.position = Vector2(20, 748 + i * 66)
-		btn.size = Vector2(600, 56)
+		btn.position = Vector2(20, 786 + i * 68)
+		btn.size = Vector2(600, 58)
 		btn.text = STATS[i]["label"]
 		btn.add_theme_font_size_override("font_size", 17)
 		var stat_key = STATS[i]["key"]
@@ -443,7 +452,7 @@ func _build_ui():
 func _make_played_panel(root: Control, pos: Vector2, title: String, col: Color) -> Array:
 	var panel = _make_round_panel(COL_PANEL, 18)
 	panel.position = pos
-	panel.size = Vector2(300, 378)
+	panel.size = Vector2(300, 388)
 	root.add_child(panel)
 
 	var title_lbl = Label.new()
@@ -456,8 +465,8 @@ func _make_played_panel(root: Control, pos: Vector2, title: String, col: Color) 
 	root.add_child(title_lbl)
 
 	var img = TextureRect.new()
-	img.position = pos + Vector2(16, 46)
-	img.size = Vector2(268, 268)
+	img.position = pos + Vector2(20, 44)
+	img.size = Vector2(260, 200)
 	img.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	img.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
 	img.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
@@ -465,12 +474,21 @@ func _make_played_panel(root: Control, pos: Vector2, title: String, col: Color) 
 	root.add_child(img)
 
 	var name_lbl = Label.new()
-	name_lbl.position = pos + Vector2(10, 320)
-	name_lbl.size = Vector2(280, 50)
+	name_lbl.position = pos + Vector2(10, 250)
+	name_lbl.size = Vector2(280, 40)
 	name_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	name_lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	name_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	name_lbl.add_theme_font_size_override("font_size", 13)
 	name_lbl.add_theme_color_override("font_color", COL_WHITE)
 	root.add_child(name_lbl)
 
-	return [img, name_lbl]
+	var stats_lbl = Label.new()
+	stats_lbl.position = pos + Vector2(0, 296)
+	stats_lbl.size = Vector2(300, 80)
+	stats_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	stats_lbl.add_theme_font_size_override("font_size", 13)
+	stats_lbl.add_theme_color_override("font_color", COL_STAT)
+	root.add_child(stats_lbl)
+
+	return [img, name_lbl, stats_lbl]

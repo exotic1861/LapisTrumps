@@ -2,3 +2,4 @@
 *.pck
 *.console.exe
 .DS_Store
+.godot/
